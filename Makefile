@@ -2,7 +2,7 @@
 
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 EXE=volume-count.py
-ORGANIZATION=weaveworksplugins
+ORGANIZATION=mjace
 IMAGE=$(ORGANIZATION)/scope-volume-count
 NAME=$(ORGANIZATION)-scope-volume-count
 UPTODATE=.volume-count.uptodate
