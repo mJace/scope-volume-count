@@ -51,8 +51,17 @@ def start_update_loop():
 def container_volume_counts():
     containers = {}
     cli = docker.APIClient(base_url=DOCKER_SOCK, version='auto')
-    for c in cli.containers(all=True):
+    client = docker.DockerClient(base_url=DOCKER_SOCK, version='auto')
+    
+    for c in cli.containers():
         containers[c['Id']] = len(c['Mounts'])
+        myCmd = 'cat /sys/fs/cgroup/cpuset/cpuset.cpus'
+        # res = client.containers.get(c['Id']).exec_run(cmd='taskset -cp 1', stream=False, demux=False)
+        res = client.containers.get(c['Id']).exec_run(cmd=myCmd, stream=False, demux=False)
+        #cpuset = res.output.decode().split(':',1)[1]
+        cpuset = res.output.decode()
+        # print(cpuset)
+        containers[c['Id']] = cpuset
     return containers
 
 
@@ -81,7 +90,7 @@ class Handler(BaseHTTPRequestHandler):
                         # Key where this data can be found.
                         'id': "volume_count",
                         # Human-friendly field name
-                        'label': "# Volumes",
+                        'label': "CPU Affinity",
                         # Look up the 'id' in the latest object.
                         'from': "latest",
                         # Priorities over 10 are hidden, lower is earlier in the list.
