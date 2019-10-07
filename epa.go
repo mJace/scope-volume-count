@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // Plugin groups the methods a plugin needs
@@ -21,7 +25,7 @@ type pluginSpec struct {
 }
 
 type node struct {
-	Node        string      `json:"nodes"`
+	Metrics      map[string]metric       `json:"metric"`
 }
 
 type metadataTemplate struct {
@@ -32,8 +36,8 @@ type metadataTemplate struct {
 }
 
 type topology struct {
-	Nodes           	string           		`json:"nodes"`
-	MetadataTemplate 	metadataTemplate 	`json:"metadata_templates"`
+	Nodes           	map[string]node	`json:"nodes"`
+	MetadataTemplate 	map[string]metadataTemplate 		`json:"metadata_templates"`
 }
 
 type report struct {
@@ -41,23 +45,65 @@ type report struct {
 	Plugins 	[]pluginSpec
 }
 
-func (p *Plugin) metadataTemplates() metadataTemplate {
-	return metadataTemplate{
+func (p *Plugin) metadataTemplates() map[string]metadataTemplate {
+	return map[string]metadataTemplate{
+		"affinity": {
 			ID:       "affinity",
 			Label:    "CPU Affinity",
 			Format:   "latest",
 			Priority: 0.1,
+		},
 	}
 }
 
-func (p *Plugin) nodes() string {
-	return "hi"
+func getContainerMounts() map[string]string {
+	affinityMap := make(map[string]string)
+	cli, err := client.NewClientWithOpts(client.WithHost("unix:///var/run/docker.sock"), client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
+	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{All:true})
+	if err != nil {
+		panic(err)
+	}
+
+	for _, container := range containers {
+		keyTmp := container.ID+"<container>"
+		affinityMap[keyTmp] = string(len(container.Mounts))
+	}
+	return affinityMap
 }
 
+func (p *Plugin) getTopologyHost() string {
+	return "abcdefgh;<container>"
+}
+
+type metric struct {
+	Date  time.Time `json:"date"`
+	Value string   `json:"value"`
+}
+
+func (p *Plugin) metrics() metric {
+	value := "0-7"
+	return metric{
+		Date : time.Now(),
+		Value: value,
+	}
+}
+
+
 func (p *Plugin) makeReport() (*report, error) {
+	metrics := p.metrics()
 	rpt := &report{
 		Container: topology{
-			Nodes: p.nodes(),
+			Nodes: map[string]node{
+				p.getTopologyHost(): {
+					map[string]metric {
+						"affinity" :
+							metrics,
+					},
+				},
+			},
 			MetadataTemplate: p.metadataTemplates(),
 		},
 		Plugins: []pluginSpec{
